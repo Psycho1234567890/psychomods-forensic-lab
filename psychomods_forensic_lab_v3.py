@@ -28,10 +28,10 @@ import plotly.graph_objects as go
 import plotly.express as px
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ExifTags
 from scipy.ndimage import uniform_filter, gaussian_filter
-from scipy.stats import chisquare, entropy as scipy_entropy
-from skimage.feature import local_binary_pattern, graycomatrix, graycoprops
-from skimage.restoration import estimate_sigma
-from skimage.measure import shannon_entropy
+# scipy.stats unused imports removed
+from skimage.feature import local_binary_pattern
+# estimate_sigma replaced with pure-numpy version for compatibility
+# skimage.measure unused
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
     TableStyle, HRFlowable, KeepTogether
@@ -290,11 +290,21 @@ def clone_detect(img: Image.Image):
 # ══════════════════════════════════════════════════════════════════════
 # ── MODULE 3 · NOISE RESIDUAL ─────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════
+def _noise_sigma_mad(arr: np.ndarray) -> float:
+    """Estimate noise sigma via Median Absolute Deviation on the Laplacian.
+    Pure numpy — no skimage.restoration dependency."""
+    sigmas = []
+    for c in range(arr.shape[2]):
+        lap = cv2.Laplacian(arr[:,:,c], cv2.CV_32F)
+        mad = float(np.median(np.abs(lap - np.median(lap))))
+        sigmas.append(mad / 0.6745)
+    return float(np.mean(sigmas))
+
 def noise_residual(img: Image.Image):
     arr  = np.array(img.convert("RGB")).astype(np.float32)
     blur = cv2.GaussianBlur(arr,(5,5),0)
     res  = np.clip(np.abs(arr-blur)*4,0,255).astype(np.uint8)
-    sig  = float(estimate_sigma(arr, channel_axis=-1, average_sigmas=True))
+    sig  = _noise_sigma_mad(arr)
     heat = cv2.applyColorMap(cv2.cvtColor(res,cv2.COLOR_RGB2GRAY), cv2.COLORMAP_HOT)
     cv2.putText(heat,f"σ={sig:.2f}",(8,22),cv2.FONT_HERSHEY_SIMPLEX,.6,(0,255,156),2)
     return cv_to_pil(heat), sig
