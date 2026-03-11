@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: psychomods-forensic-lab
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run psychomods_forensic_lab_v3.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
